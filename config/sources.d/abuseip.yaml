@@ -1,0 +1,17 @@
+enabled: true
+kind: abuseipdb
+group_base: abuseip
+api:
+  url: https://api.abuseipdb.com/api/v2/blacklist
+  confidence_min: 90
+  timestamp_path: meta.generatedAt
+rules:
+  policy: deny
+  enabled: true
+upload:
+  max_per_group: 10000
+  initial_batch_size: 10000
+  append_batch_size: 500
+  sleep_between_batches: 0.4
+  cleanup: delete
+  placeholder_ip: 192.0.2.1

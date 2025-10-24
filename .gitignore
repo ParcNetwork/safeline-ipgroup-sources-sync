@@ -1,0 +1,8 @@
+.idea/
+.DS_Store
+.ipranges_state.json
+__pycache__/
+config/.env
+*.pyc
+*.pyo
+*.pyd
