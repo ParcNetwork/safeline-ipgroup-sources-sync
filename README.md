@@ -12,6 +12,7 @@ It ensures that SafeLine always contains up-to-date IP information from trusted 
 - [Overview](#overview)
 - [Features](#features)
 - [Architecture](#architecture)
+- [Environment Configuration](#environment-configuration)
 - [Configuration (YAML Sources)](#configuration-yaml-sources) 
 - [YAML Key Reference](#yaml-key-reference)
 - [How to Add a New Source](#how-to-add-a-new-source)
@@ -71,6 +72,7 @@ requirements.txt                 # Python dependency list
 │   └── rules.py                 # Management of SafeLine rules (list, get, create, update, sync)
 │
 ├── config/
+│   ├── .env                     # Secrets storage (safeline url; token)
 │   ├── credentials.py           # Loads environment variables using Pydantic (e.g. SAFELINE_BASE_URL, API_TOKEN)
 │   ├── sources.py               # Reads and validates all YAML source definitions from `sources.d/`
 │   └── sources.d/               # Contains modular YAML configs per source
@@ -107,6 +109,18 @@ requirements.txt                 # Python dependency list
 │   └── safeline.py              # Experimental/temporary patch or extension for SafeLine API
 │
 └── meta.py                      # Utility for Meta (Facebook) GeoFeed CSV / WHOIS parsing and IP extraction
+```
+
+---
+
+## Environment Configuration
+
+All runtime credentials and API endpoints are managed via an .env file.
+A sample configuration is provided as **.env.example**
+
+Before running the project, renaming or copying of the file is required.
+```
+cp config/.env.example config/.env
 ```
 
 ---
