@@ -10,10 +10,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN useradd -m appuser
+RUN useradd -ms /bin/bash appuser
 USER appuser
 
 ENV STATE_PATH=.ipranges_state.json
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "main.py"]
+ENTRYPOINT ["python3", "main.py"]

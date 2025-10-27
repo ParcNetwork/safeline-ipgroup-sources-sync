@@ -19,6 +19,7 @@ It ensures that SafeLine always contains up-to-date IP information from trusted 
 - [AbuseIPDB Integration](#abuseipdb-integration)
 - [SafeLine Integration](#safeline-integration)
 - [Deployment](#deployment)
+- [Running with Docker](#running-with-docker)
 - [License](#license)
 
 ---
@@ -278,11 +279,61 @@ This will:
 
 ### Recommended scheduled execution
 
-- `*/5 * * * * python3 main.py --kind json-cidrs` - fast fetched but barely changes
-- `3 */1 * * * python3 main.py --kind whois-radb` - fast fetched but barely changes
-- `0 */1 * * * python3 main.py --kind abuseipdb` - changes every hour
+- `*/5 * * * * python3 main.py --kind json-cidrs` - fast fetched, rarely changes
+- `3 */1 * * * python3 main.py --kind whois-radb` - fetched hourly
+- `0 */1 * * * python3 main.py --kind abuseipdb`  - frequently updated
 
 ---
+
+## Running with Docker
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/parcnetwork/safeline-ipgroup-sources-sync.git
+cd safeline-ipgroup-sources-sync
+```
+
+### 2. Configure environment variables
+Copy the example configuration and edit it with your credentials:
+
+```bash
+cp config/.env.example config/.env
+```
+
+Edit `config/.env`:
+
+```dotenv
+SAFELINE_BASE_URL=https://<your-safeline-host>:9443/api
+SAFELINE_API_TOKEN=xxxxxxx
+ABUSEIPDB_KEY=xxxxxxx     # optional, if AbuseIPDB source is enabled
+LOG_LEVEL=INFO
+```
+
+### 3. Run the container
+
+```bash
+docker pull docker.io/parcnetwork/safeline-ipgroup-sources-sync:latest
+
+mkdir -p persist
+
+docker run --rm -it \
+  --name ip-sync \
+  --env-file ./config/.env \
+  -v "$(pwd)/config:/app/config:ro" \
+  -v "$(pwd)/persist:/app/persist" \
+  docker.io/parcnetwork/safeline-ipgroup-sources-sync:latest \
+  --only bingbot
+```
+
+### 5. Additional options
+
+| Option | Description |
+|---------|-------------|
+| `--only <source>` | Run only one specific source (e.g. `--only abuseipdb`) |
+| `--kind <type>` | Filter by source type (`json-cidrs`, `whois-radb`, `abuseipdb`) |
+| `LOG_LEVEL=DEBUG` | Enable detailed debug output |
+| Persistent volume | The file `.ipranges_state.json` is stored inside `/app/persist` |
+
 
 ## License
 
