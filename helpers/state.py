@@ -33,6 +33,9 @@ def load_state() -> Dict:
     return {}
 
 def save_state(state: Dict) -> None:
+    """
+    keep save_state atomic if any error occur
+    """
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = STATE_PATH.with_suffix(STATE_PATH.suffix + ".tmp")
     with tmp.open("w", encoding="utf-8") as f:

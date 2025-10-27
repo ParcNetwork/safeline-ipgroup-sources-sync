@@ -306,6 +306,7 @@ Edit `config/.env`:
 SAFELINE_BASE_URL=https://<your-safeline-host>:9443/api
 SAFELINE_API_TOKEN=xxxxxxx
 ABUSEIPDB_KEY=xxxxxxx     # optional, if AbuseIPDB source is enabled
+STATE_PATH=/app/persist/.ipranges_state.json # recommended way
 LOG_LEVEL=INFO
 ```
 
