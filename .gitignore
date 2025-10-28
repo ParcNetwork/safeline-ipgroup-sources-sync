@@ -3,6 +3,7 @@
 .ipranges_state.json
 __pycache__/
 config/.env
+config/local.d
 *.pyc
 *.pyo
 *.pyd

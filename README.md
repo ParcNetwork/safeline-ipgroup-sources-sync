@@ -1,8 +1,12 @@
-# SafeLine IP Range Synchronization
+# SafeLine IP Group Source Synchronization
 
-This project provides a modular Python system to automatically synchronize IP ranges from various external sources (e.g., Google, Bing, OpenAI, Meta, AbuseIPDB) with SafeLine IP groups.
+A modular Python tool that automatically synchronizes IP and CIDR data from multiple trusted external sources (e.g. Google, Bing, OpenAI, Meta, AbuseIPDB) into SafeLine IP Groups.  
+It ensures SafeLine always contains up-to-date IP information from crawlers and blacklists, with built-in batching, grouping, and state tracking.
 
-It ensures that SafeLine always contains up-to-date IP information from trusted crawlers and blacklists, with automatic batching, grouping, and state tracking.
+> **Disclaimer**  
+> This project is **not officially affiliated with or endorsed by SafeLine**.  
+> It uses SafeLine’s public API to automate group and rule management.  
+> Please visit the official product page at [https://www.safeline.com](https://www.safeline.com) for details about SafeLine itself.
 
 ---
 
@@ -14,21 +18,23 @@ It ensures that SafeLine always contains up-to-date IP information from trusted 
 - [Architecture](#architecture)
 - [Environment Configuration](#environment-configuration)
 - [Configuration (YAML Sources)](#configuration-yaml-sources) 
+- [Local Overrides (User Custom Configuration)](#local-overrides-user-custom-configuration)
 - [YAML Key Reference](#yaml-key-reference)
 - [How to Add a New Source](#how-to-add-a-new-source)
 - [AbuseIPDB Integration](#abuseipdb-integration)
 - [SafeLine Integration](#safeline-integration)
 - [Deployment](#deployment)
 - [Running with Docker](#running-with-docker)
+- [Security Recommendations](#security-recommendations)
 - [License](#license)
 
 ---
 
 ## Requirements
 
-- \>= Python3.7
-- python3 venv
-- pip3
+- Python ≥ 3.7  
+- `python3-venv`
+- `pip3`
 
 ---
 
@@ -38,25 +44,26 @@ It ensures that SafeLine always contains up-to-date IP information from trusted 
 - `source .venv/bin/activate`
 - `pip3 install -r requirements.txt`
 
+> To run with docker please have a look at [Running with Docker](#running-with-docker)
+
 ---
 
 ## Overview
 
-The synchronization process fetches IP lists or CIDR ranges from public sources and updates the corresponding SafeLine IP groups.
-
-Each source is compared against its last known update timestamp to avoid unnecessary API calls or updates.  
-AbuseIPDB is handled separately due to its large dataset (tens of thousands of IPs).
+The synchronization process fetches IP or CIDR ranges from public sources and updates the corresponding SafeLine IP groups.  
+Each source is compared against its previous state to avoid redundant API calls or updates.  
+AbuseIPDB is handled separately due to its large and frequently changing dataset.
 
 ---
 
 ## Features
 
-- Fetches and parses IP/CIDR data from multiple APIs, JSON and RADb feeds.
-- Detects updates via timestamps (e.g. `creationTime` or `generatedAt`).
-- Automatically updates SafeLine ip groups using the SafeLine API.
-- Creates allow/deny rules based on config files per data source (e.g. googlebot)
-- Handles AbuseIPDB blacklists via batching and chunked uploads.
-- Maintains state in `.ipranges_state.json` for efficient comparisons.
+- Fetches and parses IP/CIDR data from multiple APIs, JSON feeds, and RADB whois sources  
+- Detects updates using timestamps (`creationTime`, `generatedAt`, etc.)  
+- Automatically creates and updates SafeLine IP Groups  
+- Builds SafeLine allow/deny rules per source  
+- Supports batching and chunked uploads for large datasets  
+- Maintains state in `.ipranges_state.json` for efficient incremental updates  
 
 ---
 
@@ -89,7 +96,7 @@ requirements.txt                 # Python dependency list
 ├── helpers/
 │   ├── parse_source.py          # Central handler for processing each source kind (json-cidrs, radb, abuseipdb)
 │   ├── grouping.py              # Core logic for creating/updating grouped IP sets in SafeLine
-│   ├── rules_sync.py            # Ensures SafeLine rules match active IP groups (add/remove groups dynamically)
+│   ├── rules_sync.py            # Ensures SafeLine rules match active IP Groups (add/remove groups dynamically)
 │   ├── rule_init.py             # Safe initialization wrapper for rule creation before first sync
 │   ├── chunks.py                # Utilities for splitting IP lists into manageable batch sizes
 │   ├── dedup.py                 # Removes duplicate CIDRs/IPs from lists
@@ -128,9 +135,8 @@ cp config/.env.example config/.env
 
 ## Configuration (YAML Sources)
 
-All source integrations are defined as individual YAML configuration files located in  
-`config/sources.d/`.  
-Each YAML file describes one data source, including its type, origin, and synchronization behavior with SafeLine.
+Each integration is defined as a standalone YAML configuration under `config/sources.d/`.  
+Each file defines one data source, its format, and synchronization behavior.
 
 ### Example: `bingbot.yaml`
 
@@ -156,7 +162,49 @@ upload:
   cleanup: delete
   placeholder_ip: 192.0.2.1
 ```
-> Note: all configs are enabled by default and rule policy is set so **allow**
+> Note: all configs are enabled by default and the rule policy defaults to **allow**
+
+---
+
+### Local Overrides (User Custom Configuration)
+
+In order to safely customize source configurations (e.g. disable bingbot or change rule policies) without losing your changes after a project update, the system supports a local override directory:
+
+```bash
+mkdir -p config/local.d
+```
+
+This directory allows you to redefine or override any source configuration from config/sources.d/.
+
+When loading configurations, the system processes directories in the following order:
+
+	1. config/sources.d/ — default YAML files shipped with the repository
+	2. config/local.d/ — user-defined overrides (take precedence)
+
+If both directories contain a YAML file with the same name (e.g. bingbot.yaml),
+the version from local.d completely replaces the default one.
+
+### Example
+
+```
+config/
+├── sources.d/
+│   ├── bingbot.yaml        # enabled: true
+│   ├── abuseip.yaml
+│   └── googlebot.yaml
+└── local.d/
+    └── bingbot.yaml        # enabled: false
+```
+
+### Result
+```
+SOURCES["bingbot"]["enabled"] == False
+```
+
+### Notes
+
+- The config/local.d/ directory is optional and ignored if not present.
+- You can use local overrides for any supported source type (json-cidrs, whois-radb, abuseipdb).
 
 ---
 
@@ -171,7 +219,7 @@ upload:
 | **urls** | `list` | List of API or JSON URLs to fetch from (used for `json-cidrs`). |
 | **radb** | `dict` *(optional)* | RADB-specific configuration:<br>• `asn` → the ASN to query (e.g. `AS32934` for Meta). |
 | **api** | `dict` *(optional)* | AbuseIPDB-specific configuration:<br>• `url` → API endpoint<br>• `confidence_min` → minimum confidence threshold<br>• `timestamp_path` → path to “generatedAt” field<br>• `api_key` → (optional) if not loaded from `.env`. |
-| **upload** | `dict` | Upload behavior and limits:<br>• `max_per_group` → SafeLine’s 10k limit<br>• `initial_batch_size` / `append_batch_size` → chunk sizes for updates<br>• `sleep_between_batches` → delay between upload batches<br>• `cleanup` → how to handle extra groups (`delete`, `placeholder`, `clear`, `keep`)<br>• `placeholder_ip` → fallback IP if placeholders are used. |
+| **upload** | `dict` | Upload behavior and limits:<br>• `max_per_group` → SafeLine’s per-group limit (10,000 entries)<br>• `initial_batch_size` / `append_batch_size` → chunk sizes for updates<br>• `sleep_between_batches` → delay between upload batches<br>• `cleanup` → how to handle extra groups (`delete`, `placeholder`, `clear`, `keep`)<br>• `placeholder_ip` → fallback IP if placeholders are used. |
 | **rules** | `dict` | Rule synchronization configuration:<br>• `policy` → `allow` or `deny`<br>• `enabled` → whether the rule should be active<br>• `name` *(optional)* → custom rule name override. |
 
 ---
@@ -226,7 +274,7 @@ upload:
 
 ## AbuseIPDB Integration
 
-The AbuseIPDB blacklist can contain up to 500,000 IPs. The maximum amount to retrieve is based on the selected plan.
+The AbuseIPDB blacklist can contain up to 500,000 IPs. The maximum number retrieved depends on your account plan.
 - Free: 10,000
 - Basic: 100,000
 - Premium: 500,000
@@ -241,18 +289,19 @@ Since SafeLine only allows **10,000 entries per group**, the system automaticall
    - First batch uses `update` (Replace)
    - Remaining batches use `append` (Add)
 
-This design ensures efficient synchronization and reduces risk of timeouts for the cost of performance.
+This design ensures efficient synchronization and reduces risk of timeouts at the cost of some performance overhead
 
 ---
 
 ## SafeLine Integration
 
 The SafeLine API is used to:
-- Fetch existing group IDs.
-- Create or update IP groups.
-- Append IPs in small batches to reduce load.
+- Retrieve and manage existing IP Groups  
+- Create or append groups dynamically based on source changes  
+- Maintain associated allow/deny rules automatically  
 
-All requests include necessary authentication headers and support both `verify=False` (for internal networks) and configurable base URLs via environment variables.
+All requests include proper authentication headers.  
+SSL verification can be disabled for internal SafeLine instances by setting `verify=False` in your configuration.
 
 ---
 
@@ -272,10 +321,10 @@ All requests include necessary authentication headers and support both `verify=F
 python main.py
 ```
 
-This will:
-- Fetch all configured IP/CIDR sources.
-- Compare with the saved state.
-- Update SafeLine groups where needed.
+This command:
+- Loads all enabled YAML source configurations
+- Compares each source against its saved state.
+- Updates or recreates the corresponding Safeline IP Groups if changes are detected.
 
 ### Recommended scheduled execution
 
@@ -287,13 +336,13 @@ This will:
 
 ## Running with Docker
 
-### 1. Clone the repository
+### Clone the repository
 ```bash
 git clone https://github.com/parcnetwork/safeline-ipgroup-sources-sync.git
 cd safeline-ipgroup-sources-sync
 ```
 
-### 2. Configure environment variables
+### Configure environment variables
 Copy the example configuration and edit it with your credentials:
 
 ```bash
@@ -310,23 +359,17 @@ STATE_PATH=/app/persist/.ipranges_state.json # recommended way
 LOG_LEVEL=INFO
 ```
 
-### 3. Run the container
+### Run the container
 
 ```bash
 docker pull docker.io/parcnetwork/safeline-ipgroup-sources-sync:latest
 
 mkdir -p persist
 
-docker run --rm -it \
-  --name ip-sync \
-  --env-file ./config/.env \
-  -v "$(pwd)/config:/app/config:ro" \
-  -v "$(pwd)/persist:/app/persist" \
-  docker.io/parcnetwork/safeline-ipgroup-sources-sync:latest \
-  --only bingbot
+docker run --rm -it   --name ip-sync   --env-file ./config/.env   -v "$(pwd)/config:/app/config:ro"   -v "$(pwd)/persist:/app/persist"   docker.io/parcnetwork/safeline-ipgroup-sources-sync:latest   --only bingbot
 ```
 
-### 5. Additional options
+### Additional options
 
 | Option | Description |
 |---------|-------------|
@@ -335,8 +378,26 @@ docker run --rm -it \
 | `LOG_LEVEL=DEBUG` | Enable detailed debug output |
 | Persistent volume | The file `.ipranges_state.json` is stored inside `/app/persist` |
 
+---
+
+## Security Recommendations
+
+For security and maintainability:
+
+- Run this tool **on a dedicated virtual machine (VM), LXC container, or isolated environment**.  
+  It performs network calls and API writes, and should not share credentials with unrelated services.
+- Avoid sharing your SafeLine API token or AbuseIPDB key publicly.  
+- Mount the `/persist` directory as a persistent volume to retain state between runs.  
+- Run the container as a non-root user if possible:
+  ```bash
+  docker run -u $(id -u):$(id -g) ...
+  ```
+
+---
 
 ## License
 
 This project is proprietary to **parc-network**.  
-All rights reserved. Redistribution or modification is not permitted without authorization.
+All rights reserved. Redistribution or modification is not permitted without authorization.  
+The tool is not an official SafeLine product or endorsed integration.
+
