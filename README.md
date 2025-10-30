@@ -6,7 +6,7 @@ It ensures SafeLine always contains up-to-date IP information from crawlers and 
 > **Disclaimer**  
 > This project is **not officially affiliated with or endorsed by SafeLine**.  
 > It uses SafeLine’s public API to automate group and rule management.  
-> Please visit the official product page at [https://www.safeline.com](https://www.safeline.com) for details about SafeLine itself.
+> Please visit the official product page at [https://safepoint.cloud/landing/safeline](https://safepoint.cloud/landing/safeline) for details about SafeLine itself.
 
 ---
 
@@ -370,21 +370,23 @@ docker run --rm -it   --name ip-sync   --env-file ./config/.env   -v "$(pwd)/con
 
 ### Cron scheduling
 
-- Store configuration and automation scripts in /opt/safeline-sync
-
-```bash
-sudo mkdir -p /opt/safeline-sync/{config,persist}
-sudo cp -r config/sources.d /opt/safeline-sync/config/
-sudo cp config/.env /opt/safeline-sync/config/
-sudo cp cron-scripts/run_sync.sh /opt/safeline-sync
-```
-
 - Example cron integration (hourly update all sources)
 
 ```
-*/60 * * * * /opt/safeline-sync/run_sync.sh >> /var/log/safeline-sync.log 2>&1
+0 /1 * * * /path/repo/cron-scripts/run_sync.sh # optional >> /path/to/log/safeline-sync.log 2>&1
 ```
 
+- Example cron integration specific source
+
+```
+0 /1 * * * /path/repo/cron-scripts/run_sync.sh --only gptbot >> /path/to/log/safeline-sync.log 2>&1
+```
+
+- Example cron integration specific kind
+
+```
+0 /1 * * * /path/repo/cron-scripts/run_sync.sh --kind json-cidrs >> /path/to/log/safeline-sync.log 2>&1
+```
 ### Additional options
 
 | Option | Description |
