@@ -7,3 +7,4 @@ config/local.d
 *.pyc
 *.pyo
 *.pyd
+.docker
