@@ -7,9 +7,29 @@ RULES_ENDPOINT = "/open/policy"
 
 
 def list_rules() -> List[Dict[str, Any]]:
-    resp = _request("GET", f"{RULES_ENDPOINT}?action=-1")
-    data = resp.json()
-    return data.get("data", {}).get("data", []) or []
+    all_rules: List[Dict[str, Any]] = []
+    page = 1
+    page_size = 100
+
+    while True:
+        resp = _request("GET", f"{RULES_ENDPOINT}?page={page}&page_size={page_size}&action=-1")
+        data = resp.json().get("data", {})
+
+        rules = data.get("data", []) or []
+
+        all_rules.extend(rules)
+
+        if not rules:
+            break
+
+        total = data.get("total")
+        if total and len(all_rules) >= total:
+            # saves a possible request just to determine page is empty
+            break
+
+        page += 1
+
+    return all_rules
 
 
 def get_rule_by_name(name: str) -> Optional[Dict[str, Any]]:
