@@ -36,6 +36,8 @@ It ensures SafeLine always contains up-to-date IP information from crawlers and 
 - `python3-venv`
 - `pip3`
 
+> Only if execution does not happen by docker
+
 ---
 
 ## Installation
@@ -144,6 +146,7 @@ Each file defines one data source, its format, and synchronization behavior.
 enabled: true
 kind: json-cidrs
 group_base: bingbot
+change_detector: auto 
 urls:
   - https://www.bing.com/toolbox/bingbot.json
 json:
@@ -210,17 +213,18 @@ SOURCES["bingbot"]["enabled"] == False
 
 ### YAML Key Reference
 
-| Key | Type | Description |
-|------|------|-------------|
-| **enabled** | `bool` | Whether this source is active and should be processed. |
-| **kind** | `string` | Defines the source type:<br>• `json-cidrs` – for JSON IP ranges (e.g., Google, Bing, OpenAI)<br>• `whois-radb` – for ASN-based whois lookups (e.g., Meta/Facebook)<br>• `abuseipdb` – for AbuseIPDB blacklist fetching. |
-| **group_base** | `string` | Base name used for group creation (`parc_<group_base>-001`). |
-| **json** | `dict` *(optional)* | JSON-specific options:<br>• `timestamp_field` → key for creation time<br>• `cidr_fields` → fields containing CIDRs (usually `ipv4Prefix` and `ipv6Prefix`). |
-| **urls** | `list` | List of API or JSON URLs to fetch from (used for `json-cidrs`). |
-| **radb** | `dict` *(optional)* | RADB-specific configuration:<br>• `asn` → the ASN to query (e.g. `AS32934` for Meta). |
-| **api** | `dict` *(optional)* | AbuseIPDB-specific configuration:<br>• `url` → API endpoint<br>• `confidence_min` → minimum confidence threshold<br>• `timestamp_path` → path to “generatedAt” field<br>• `api_key` → (optional) if not loaded from `.env`. |
-| **upload** | `dict` | Upload behavior and limits:<br>• `max_per_group` → SafeLine’s per-group limit (10,000 entries)<br>• `initial_batch_size` / `append_batch_size` → chunk sizes for updates<br>• `sleep_between_batches` → delay between upload batches<br>• `cleanup` → how to handle extra groups (`delete`, `placeholder`, `clear`, `keep`)<br>• `placeholder_ip` → fallback IP if placeholders are used. |
-| **rules** | `dict` | Rule synchronization configuration:<br>• `policy` → `allow` or `deny`<br>• `enabled` → whether the rule should be active<br>• `name` *(optional)* → custom rule name override. |
+| Key                 | Type | Description                                                                                                                                                                                                                                                                                                                                                                               |
+|---------------------|------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **enabled**         | `bool` | Whether this source is active and should be processed.                                                                                                                                                                                                                                                                                                                                    |
+| **kind**            | `string` | Defines the source type:<br>• `json-cidrs` – for JSON IP ranges (e.g., Google, Bing, OpenAI)<br>• `whois-radb` – for ASN-based whois lookups (e.g., Meta/Facebook)<br>• `abuseipdb` – for AbuseIPDB blacklist fetching.                                                                                                                                                                   |
+| **group_base**      | `string` | Base name used for group creation (`parc_<group_base>-001`).                                                                                                                                                                                                                                                                                                                              |
+| **change_detector** | `string` | Defines how changes are detected for the source: <br>• `timestamp` – use the timestamp field from the source (default) <br>• `hash` – compare the hash of all IPs/CIDRs <br>• `auto` – automatically fall back to hash if no timestamp is present. |
+| **json**            | `dict` *(optional)* | JSON-specific options:<br>• `timestamp_field` → key for creation time<br>• `cidr_fields` → fields containing CIDRs (usually `ipv4Prefix` and `ipv6Prefix`).                                                                                                                                                                                                                               |
+| **urls**            | `list` | List of API or JSON URLs to fetch from (used for `json-cidrs`).                                                                                                                                                                                                                                                                                                                           |
+| **radb**            | `dict` *(optional)* | RADB-specific configuration:<br>• `asn` → the ASN to query (e.g. `AS32934` for Meta).                                                                                                                                                                                                                                                                                                     |
+| **api**             | `dict` *(optional)* | AbuseIPDB-specific configuration:<br>• `url` → API endpoint<br>• `confidence_min` → minimum confidence threshold<br>• `timestamp_path` → path to “generatedAt” field<br>• `api_key` → (optional) if not loaded from `.env`.                                                                                                                                                               |
+| **upload**          | `dict` | Upload behavior and limits:<br>• `max_per_group` → SafeLine’s per-group limit (10,000 entries)<br>• `initial_batch_size` / `append_batch_size` → chunk sizes for updates<br>• `sleep_between_batches` → delay between upload batches<br>• `cleanup` → how to handle extra groups (`delete`, `placeholder`, `clear`, `keep`)<br>• `placeholder_ip` → fallback IP if placeholders are used. |
+| **rules**           | `dict` | Rule synchronization configuration:<br>• `policy` → `allow` or `deny`<br>• `enabled` → whether the rule should be active<br>• `name` *(optional)* → custom rule name override.                                                                                                                                                                                                            |
 
 ---
 
@@ -245,6 +249,7 @@ SOURCES["bingbot"]["enabled"] == False
    enabled: true
    kind: json-cidrs
    group_base: gptbot
+   change_detector: auto
    urls:
      - https://openai.com/gptbot.json
    upload:
@@ -326,12 +331,6 @@ This command:
 - Compares each source against its saved state.
 - Updates or recreates the corresponding Safeline IP Groups if changes are detected.
 
-### Recommended scheduled execution
-
-- `*/5 * * * * python3 main.py --kind json-cidrs` - fast fetched, rarely changes
-- `3 */1 * * * python3 main.py --kind whois-radb` - fetched hourly
-- `0 */1 * * * python3 main.py --kind abuseipdb`  - frequently updated
-
 ---
 
 ## Running with Docker
@@ -367,6 +366,23 @@ docker pull docker.io/parcnetwork/safeline-ipgroup-sources-sync:latest
 mkdir -p persist
 
 docker run --rm -it   --name ip-sync   --env-file ./config/.env   -v "$(pwd)/config:/app/config:ro"   -v "$(pwd)/persist:/app/persist"   docker.io/parcnetwork/safeline-ipgroup-sources-sync:latest   --only bingbot
+```
+
+### Cron scheduling
+
+- Store configuration and automation scripts in /opt/safeline-sync
+
+```bash
+sudo mkdir -p /opt/safeline-sync/{config,persist}
+sudo cp -r config/sources.d /opt/safeline-sync/config/
+sudo cp config/.env /opt/safeline-sync/config/
+sudo cp cron-scripts/run_sync.sh /opt/safeline-sync
+```
+
+- Example cron integration (hourly update all sources)
+
+```
+*/60 * * * * /opt/safeline-sync/run_sync.sh >> /var/log/safeline-sync.log 2>&1
 ```
 
 ### Additional options

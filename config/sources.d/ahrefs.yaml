@@ -1,6 +1,7 @@
 enabled: true
 kind: json-cidrs
 group_base: ahrefsbot
+change_detector: auto
 urls:
   - https://api.ahrefs.com/v3/public/crawler-ip-ranges
 json:

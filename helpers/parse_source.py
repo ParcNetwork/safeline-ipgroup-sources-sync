@@ -10,6 +10,8 @@ from config.credentials import settings
 
 from helpers.rules_sync import sync_rule_to_used
 from helpers.rule_init import ensure_rule_safe
+from helpers.dedup import dedup_cidrs
+from helpers.change_detect import decide_change
 from helpers import log
 
 
@@ -37,6 +39,8 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
     cleanup_action = upload.get("cleanup")
     placeholder_ip = upload.get("placeholder_ip")
 
+    detector = cfg.get("change_detector", "timestamp").lower()
+
     if kind == "json-cidrs":
         json_cfg = cfg.get("json", {}) or {}
         ts_field = json_cfg.get("timestamp_field", "creationTime")
@@ -58,7 +62,8 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
                 append_batch_size=append_batch_size,
                 sleep_between_batches=sleep_between_batches,
                 cleanup_action=cleanup_action,
-                rule_name=rule_name
+                rule_name=rule_name,
+                change_detector=detector
             )
 
             _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
@@ -134,43 +139,64 @@ def _maybe_patch_json_source(
     append_batch_size: Optional[int],
     sleep_between_batches: Optional[float],
     cleanup_action: str,
-    rule_name: str
+    rule_name: str,
+    change_detector: str = "timestamp"
 ) -> None:
-    prev = state.get(url)
-    if new_ts is None:
-        log.warning("%s: no timestamp — process anyway.", url)
-    elif prev == new_ts:
-        log.info("%s: unchanged (%s) — skip.", url, new_ts)
-        return
-    else:
-        log.info("%s: %s -> %s", url, prev, new_ts)
+    entries = dedup_cidrs(cidrs)
 
-    prev_groups = int(state.get(f"{base_group}_group_count", 0))
+    state_key_ts = url
+    state_key_hash = f"hash:{url}"
+
+    should_update, state_updates = decide_change(
+        detector=change_detector,
+        state=state,
+        state_key_ts=state_key_ts,
+        state_key_hash=state_key_hash,
+        new_ts=new_ts,
+        entries=entries,
+    )
+
+    if not should_update:
+        if change_detector == "hash" or (change_detector == "auto" and not new_ts):
+            log.info("%s: unchanged (hash) — skip.", url)
+        else:
+            log.info("%s: unchanged (%s) — skip.", url, new_ts)
+        state.update(state_updates)
+        return
+
     used = upsert_grouped_entries(
         entries=cidrs,
         base_group_name=base_group,
         max_per_group=max_per_group,
-        initial_batch_size=int(initial_batch_size),
-        append_batch_size=int(append_batch_size),
-        sleep_between_batches=float(sleep_between_batches),
-        placeholder_ip=placeholder_ip
-    )
-
-    cleanup_extra_groups(
-        base_group_name=base_group,
-        used_count=used,
-        previous_count=prev_groups,
+        initial_batch_size=initial_batch_size,
+        append_batch_size=append_batch_size,
+        sleep_between_batches=sleep_between_batches,
         placeholder_ip=placeholder_ip,
-        action=cleanup_action
     )
 
     try:
         sync_rule_to_used(rule_name, base_group, used)
     except Exception as e:
         log.warning("rule sync failed for '%s': %s", rule_name, e)
+
+    prev_groups = int(state.get(f"{base_group}_group_count", 0))
+    cleanup_extra_groups(
+        base_group_name=base_group,
+        used_count=used,
+        previous_count=prev_groups,
+        action=(cleanup_action or "delete"),
+        placeholder_ip=(placeholder_ip or "192.0.2.1"),
+    )
+
+    state.update(state_updates)
     state[f"{base_group}_group_count"] = used
-    if new_ts is not None:
-        state[url] = new_ts
+    state[f"{base_group}_count"] = len(entries)
+
+    if "hash" in state_updates:
+        log.info("%s: updated (hash changed, %d entries)", url, len(entries))
+    else:
+        log.info("%s: updated (%s -> %s, %d entries)",
+                 url, state.get(state_key_ts), new_ts, len(entries))
 
 def _maybe_patch_radb_source(
     *,
@@ -206,7 +232,10 @@ def _maybe_patch_radb_source(
         placeholder_ip=placeholder_ip,
     )
 
-    from helpers.grouping import cleanup_extra_groups
+    try:
+        sync_rule_to_used(rule_name, base_group, used)
+    except Exception as e:
+        log.warning("rule sync failed for '%s': %s", rule_name, e)
 
     cleanup_extra_groups(
         base_group_name=base_group,
@@ -216,13 +245,9 @@ def _maybe_patch_radb_source(
         action=cleanup_action
     )
 
-    try:
-        sync_rule_to_used(rule_name, base_group, used)
-    except Exception as e:
-        log.warning("rule sync failed for '%s': %s", rule_name, e)
-
     state[f"{base_group}_group_count"] = used
     state[key] = new_hash
+
 
 def _maybe_patch_abuseip(
     state_key: str,
@@ -239,47 +264,27 @@ def _maybe_patch_abuseip(
     placeholder_ip: str,
     rule_name: str
 ) -> None:
-    prev_ct = state.get(state_key)
     prev_groups = int(state.get(f"{base_group}_group_count", 0))
 
-    def run() -> int:
-        return upsert_grouped_entries(
-            entries=ips,
-            base_group_name=base_group,
-            max_per_group=max_per_group,
-            initial_batch_size=initial_batch_size,
-            append_batch_size=append_batch_size,
-            sleep_between_batches=sleep_between_batches,
-            placeholder_ip=placeholder_ip
-        )
+    unique_ips = dedup_cidrs(ips)
+    new_hash = _hash_list(unique_ips)
+    hash_state_key = f"{state_key}#hash"
+    prev_hash = state.get(hash_state_key)
 
-    if generated_at is None:
-        log.warning("%s: no generatedAt — process anyway.", state_key)
-        used = run()
-        cleanup_extra_groups(
-            base_group_name=base_group,
-            used_count=used,
-            previous_count=prev_groups,
-            placeholder_ip=placeholder_ip,
-            action=cleanup_action
-        )
-
-        state[f"{base_group}_group_count"] = used
+    if prev_hash == new_hash:
+        log.info("%s: unchanged (hash) — skip.", state_key)
+        if generated_at:
+            state[state_key] = generated_at
         return
 
-    if prev_ct == generated_at:
-        log.info("%s: unchanged (%s) — skip.", state_key, generated_at)
-        return
-
-    log.info("%s: %s -> %s", state_key, prev_ct, generated_at)
-    used = run()
-
-    cleanup_extra_groups(
+    used = upsert_grouped_entries(
+        entries=unique_ips,
         base_group_name=base_group,
-        used_count=used,
-        previous_count=prev_groups,
+        max_per_group=max_per_group,
+        initial_batch_size=initial_batch_size,
+        append_batch_size=append_batch_size,
+        sleep_between_batches=sleep_between_batches,
         placeholder_ip=placeholder_ip,
-        action=cleanup_action
     )
 
     try:
@@ -287,5 +292,17 @@ def _maybe_patch_abuseip(
     except Exception as e:
         log.warning("rule sync failed for '%s': %s", rule_name, e)
 
-    state[state_key] = generated_at
+    cleanup_extra_groups(
+        base_group_name=base_group,
+        used_count=used,
+        previous_count=prev_groups,
+        action=cleanup_action,
+        placeholder_ip=placeholder_ip,
+    )
+
+    state[hash_state_key] = new_hash
+    if generated_at:
+        state[state_key] = generated_at
     state[f"{base_group}_group_count"] = used
+    state[f"{base_group}_count"] = len(unique_ips)
+    log.info("%s: updated (hash changed, %d entries)", state_key, len(unique_ips))

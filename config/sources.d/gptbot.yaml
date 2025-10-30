@@ -1,6 +1,7 @@
 enabled: true
 kind: json-cidrs
 group_base: gptbot
+change_detector: auto
 urls:
   - https://openai.com/gptbot.json
 json:

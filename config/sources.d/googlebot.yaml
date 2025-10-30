@@ -1,6 +1,7 @@
 enabled: true
 kind: json-cidrs
 group_base: googlebot
+change_detector: auto
 urls:
   - https://developers.google.com/static/search/apis/ipranges/googlebot.json
 json:

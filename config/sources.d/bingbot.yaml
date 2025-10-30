@@ -1,6 +1,7 @@
 enabled: true
 kind: json-cidrs
 group_base: bingbot
+change_detector: auto
 urls:
   - https://www.bing.com/toolbox/bingbot.json
 json:

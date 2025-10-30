@@ -1,6 +1,7 @@
 enabled: true
 kind: json-cidrs
 group_base: duckduckgobot
+change_detector: auto
 urls:
   - https://duckduckgo.com/duckduckbot.json
 json:

@@ -1,6 +1,7 @@
 enabled: true
 kind: json-cidrs
 group_base: google-special-crawlers
+change_detector: auto
 urls:
   - https://developers.google.com/static/search/apis/ipranges/special-crawlers.json
 json:

@@ -1,6 +1,7 @@
 enabled: true
 kind: abuseipdb
 group_base: abuseip
+change_detector: auto
 api:
   url: https://api.abuseipdb.com/api/v2/blacklist
   confidence_min: 90
