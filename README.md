@@ -373,19 +373,19 @@ docker run --rm -it   --name ip-sync   --env-file ./config/.env   -v "$(pwd)/con
 - Example cron integration (hourly update all sources)
 
 ```
-0 /1 * * * /path/repo/cron-scripts/run_sync.sh # optional >> /path/to/log/safeline-sync.log 2>&1
+0 */1 * * * /path/repo/cron-scripts/run_sync.sh # optional >> /path/to/log/safeline-sync.log 2>&1
 ```
 
 - Example cron integration specific source
 
 ```
-0 /1 * * * /path/repo/cron-scripts/run_sync.sh --only gptbot >> /path/to/log/safeline-sync.log 2>&1
+0 */1 * * * /path/repo/cron-scripts/run_sync.sh --only gptbot >> /path/to/log/safeline-sync.log 2>&1
 ```
 
 - Example cron integration specific kind
 
 ```
-0 /1 * * * /path/repo/cron-scripts/run_sync.sh --kind json-cidrs >> /path/to/log/safeline-sync.log 2>&1
+0 */1 * * * /path/repo/cron-scripts/run_sync.sh --kind json-cidrs >> /path/to/log/safeline-sync.log 2>&1
 ```
 ### Additional options
 
