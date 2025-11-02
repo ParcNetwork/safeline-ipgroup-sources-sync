@@ -29,7 +29,7 @@ flock -n 9 || exit 0
 SOURCES_DIRS_DEFAULT="/app/config/sources.d:/app/config/local.d"
 SOURCES_DIRS="${SOURCES_DIRS_OVERRIDE:-"${SOURCES_DIRS_DEFAULT}"}"
 
-exec ${RUNTIME} run --rm -it \
+exec ${RUNTIME} run --rm \
   --name ip-sync \
   --env-file "${ENV_FILE}" \
   -e "STATE_PATH=/app/persist/.ipranges_state.json" \
