@@ -21,7 +21,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--kind",
         default=KIND_ALL,
-        choices=[KIND_ALL, "json-cidrs", "whois-radb", "abuseipdb"],
+        choices=[KIND_ALL, "json-cidrs", "whois-radb", "abuseipdb", "txt-cidrs"],
         help="Limit processing to a specific source kind."
     )
     p.add_argument(

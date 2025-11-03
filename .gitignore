@@ -8,3 +8,4 @@ config/local.d
 *.pyo
 *.pyd
 .docker
+.venv

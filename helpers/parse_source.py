@@ -13,6 +13,7 @@ from helpers.rule_init import ensure_rule_safe
 from helpers.dedup import dedup_cidrs
 from helpers.change_detect import decide_change
 from helpers import log
+from helpers.text_lists import fetch_text_lines
 
 
 def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> None:
@@ -118,6 +119,28 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
             cleanup_action=cleanup_action,
             placeholder_ip=placeholder_ip,
             rule_name=rule_name
+        )
+
+        _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+
+    elif kind == "txt-cidrs":
+        urls = cfg.get("urls") or []
+        if not urls:
+            log.warning("%s: no urls configured — skipping.", name)
+            return
+
+        _maybe_patch_txt_source(
+            name=name,
+            urls=urls,
+            base_group=base,
+            state=state,
+            rule_name=rule_name,
+            placeholder_ip=upload.get("placeholder_ip"),
+            max_per_group=int(upload.get("max_per_group", 10_000)),
+            initial_batch_size=int(upload.get("initial_batch_size", 10_000)),
+            append_batch_size=int(upload.get("append_batch_size", 500)),
+            sleep_between_batches=float(upload.get("sleep_between_batches", 0.2)),
+            cleanup_action=upload.get("cleanup", "delete"),
         )
 
         _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
@@ -247,6 +270,69 @@ def _maybe_patch_radb_source(
 
     state[f"{base_group}_group_count"] = used
     state[key] = new_hash
+
+def _maybe_patch_txt_source(
+    *,
+    name: str,
+    urls: list[str],
+    base_group: str,
+    state: dict,
+    rule_name: str,
+    placeholder_ip: str | None,
+    max_per_group: int,
+    initial_batch_size: int,
+    append_batch_size: int,
+    sleep_between_batches: float,
+    cleanup_action: str | None,
+) -> None:
+    all_lines: list[str] = []
+    for u in urls:
+        try:
+            lines = fetch_text_lines(u)
+            all_lines.extend(lines)
+        except Exception as e:
+            log.error("%s: fetch failed for %s: %s", name, u, e)
+            continue
+
+    unique_ips = dedup_cidrs(all_lines)
+    key = f"txt:{name}"
+    new_hash = _hash_list(unique_ips)
+    prev_hash = state.get(key)
+
+    if prev_hash == new_hash:
+        log.info("%s: unchanged — skip.", name)
+        return
+
+    log.info("%s: hash changed", name)
+
+    used = upsert_grouped_entries(
+        entries=unique_ips,
+        base_group_name=base_group,
+        max_per_group=max_per_group,
+        initial_batch_size=initial_batch_size,
+        append_batch_size=append_batch_size,
+        sleep_between_batches=sleep_between_batches,
+        placeholder_ip=placeholder_ip,
+    )
+
+    try:
+        sync_rule_to_used(rule_name, base_group, used)
+    except Exception as e:
+        log.warning("rule sync failed for '%s': %s", rule_name, e)
+
+    prev_groups = int(state.get(f"{base_group}_group_count", 0))
+
+    cleanup_extra_groups(
+        base_group_name=base_group,
+        used_count=used,
+        previous_count=prev_groups,
+        placeholder_ip=placeholder_ip,
+        action=cleanup_action,
+    )
+
+    state[key] = new_hash
+    state[f"{base_group}_group_count"] = used
+    log.info("%s: updated (hash changed, %d entries)", key, len(unique_ips))
 
 
 def _maybe_patch_abuseip(
