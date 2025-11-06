@@ -28,8 +28,8 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
 
     action_by_policy = {"allow": 0, "deny": 1} # mapping
     rules_cfg = cfg.get("rules") or {}
-    rule_policy_str = rules_cfg.get("policy", "deny").lower()
-    rule_policy = action_by_policy.get(rule_policy_str, 1)
+    rule_policy_str = rules_cfg.get("policy", "").lower()
+    rule_policy = action_by_policy.get(rule_policy_str)
     rule_name = rules_cfg.get("name", base)
     rule_enabled = rules_cfg.get("enabled")
 
@@ -67,7 +67,10 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
                 change_detector=detector
             )
 
-            _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+            if rule_policy is not None:
+                _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+            else:
+                log.debug("%s: skipping rule setup — no valid policy set.", rule_name)
 
     elif kind == "whois-radb":
         rconf = cfg.get("radb", {}) or {}
@@ -92,7 +95,10 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
             rule_name=rule_name
         )
 
-        _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        if rule_policy is not None:
+            _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        else:
+            log.debug("%s: skipping rule setup — no valid policy set.", rule_name)
 
     elif kind == "abuseipdb":
         p = cfg["api"]
@@ -121,7 +127,10 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
             rule_name=rule_name
         )
 
-        _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        if rule_policy is not None:
+            _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        else:
+            log.debug("%s: skipping rule setup — no valid policy set.", rule_name)
 
     elif kind == "txt-cidrs":
         urls = cfg.get("urls") or []
@@ -143,7 +152,10 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
             cleanup_action=upload.get("cleanup", "delete"),
         )
 
-        _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        if rule_policy is not None:
+            _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        else:
+            log.debug("%s: skipping rule setup — no valid policy set.", rule_name)
 
     else:
         log.warning("%s: unknown kind '%s' – skipping.", name, kind)
