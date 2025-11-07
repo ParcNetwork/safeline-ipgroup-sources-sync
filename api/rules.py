@@ -87,3 +87,11 @@ def update_rule_action(policy: int, rule: dict[str, Any],
         "log": fields["log"],
     }
     _request("PUT", RULES_ENDPOINT, json=body)
+
+def delete_rule(rule_name: str) -> bool:
+    rule: Optional[Dict[str, Any]] = get_rule_by_name(rule_name)
+    if not rule:
+        return False
+    body = {"id": int(rule["id"])}
+    _request("DELETE", RULES_ENDPOINT, json=body)
+    return True

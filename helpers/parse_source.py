@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Any
 
 from api.abuse_ip import fetch_abuseip_blacklist
+from api.rules import delete_rule
 from helpers.json_helpers import fetch_json, extract_cidrs_from_json
 from helpers.grouping import upsert_grouped_entries, cleanup_extra_groups
 from helpers.hash import _hash_list
@@ -14,6 +15,7 @@ from helpers.dedup import dedup_cidrs
 from helpers.change_detect import decide_change
 from helpers import log
 from helpers.text_lists import fetch_text_lines
+from helpers.ipsum.process_ipsum import process_ipsum_scored
 
 
 def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> None:
@@ -26,7 +28,7 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
     base = f"parc_{base_core}"
     upload = cfg.get("upload", {}) or {}
 
-    action_by_policy = {"allow": 0, "deny": 1} # mapping
+    action_by_policy = {"allow": 0, "deny": 1}
     rules_cfg = cfg.get("rules") or {}
     rule_policy_str = rules_cfg.get("policy", "").lower()
     rule_policy = action_by_policy.get(rule_policy_str)
@@ -41,6 +43,18 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
     placeholder_ip = upload.get("placeholder_ip")
 
     detector = cfg.get("change_detector", "timestamp").lower()
+
+    if kind == "txt-scored":
+        actions = process_ipsum_scored(name, cfg, state)
+        for rule_name, rule_policy, base, rule_enabled in actions:
+            if rule_policy is None:
+                if delete_rule(rule_name):
+                    log.info("%s: rule deleted (no policy in YAML)", rule_name)
+                else:
+                    log.debug("%s: no rule to delete (no policy in YAML)", rule_name)
+            else:
+                ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        return
 
     if kind == "json-cidrs":
         json_cfg = cfg.get("json", {}) or {}
@@ -67,10 +81,13 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
                 change_detector=detector
             )
 
-            if rule_policy is not None:
-                _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+            if rule_policy is None:
+                if delete_rule(rule_name):
+                    log.info("%s: rule deleted (no policy in YAML)", rule_name)
+                else:
+                    log.debug("%s: no rule to delete (no policy in YAML)", rule_name)
             else:
-                log.debug("%s: skipping rule setup — no valid policy set.", rule_name)
+                ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
 
     elif kind == "whois-radb":
         rconf = cfg.get("radb", {}) or {}
@@ -95,10 +112,13 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
             rule_name=rule_name
         )
 
-        if rule_policy is not None:
-            _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        if rule_policy is None:
+            if delete_rule(rule_name):
+                log.info("%s: rule deleted (no policy in YAML)", rule_name)
+            else:
+                log.debug("%s: no rule to delete (no policy in YAML)", rule_name)
         else:
-            log.debug("%s: skipping rule setup — no valid policy set.", rule_name)
+            ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
 
     elif kind == "abuseipdb":
         p = cfg["api"]
@@ -127,10 +147,13 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
             rule_name=rule_name
         )
 
-        if rule_policy is not None:
-            _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        if rule_policy is None:
+            if delete_rule(rule_name):
+                log.info("%s: rule deleted (no policy in YAML)", rule_name)
+            else:
+                log.debug("%s: no rule to delete (no policy in YAML)", rule_name)
         else:
-            log.debug("%s: skipping rule setup — no valid policy set.", rule_name)
+            ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
 
     elif kind == "txt-cidrs":
         urls = cfg.get("urls") or []
@@ -152,10 +175,13 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
             cleanup_action=upload.get("cleanup", "delete"),
         )
 
-        if rule_policy is not None:
-            _ = ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+        if rule_policy is None:
+            if delete_rule(rule_name):
+                log.info("%s: rule deleted (no policy in YAML)", rule_name)
+            else:
+                log.debug("%s: no rule to delete (no policy in YAML)", rule_name)
         else:
-            log.debug("%s: skipping rule setup — no valid policy set.", rule_name)
+            ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
 
     else:
         log.warning("%s: unknown kind '%s' – skipping.", name, kind)

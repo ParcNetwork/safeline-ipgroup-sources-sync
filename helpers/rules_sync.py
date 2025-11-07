@@ -1,7 +1,12 @@
 from __future__ import annotations
-from typing import List, Dict, Any, Optional
+from typing import List
+from api.rules import (
+    get_rule_by_name,
+    create_rule_minimal,
+    update_rule_action,
+    update_rule_ip_groups
+)
 from api.safeline import get_ip_group_id
-from api.rules import get_rule_by_name, create_rule_minimal, update_rule_action, update_rule_ip_groups
 from helpers import log
 
 
@@ -23,7 +28,7 @@ def ensure_rule_for_source(rule_name: str, policy: int, base_group: str,
         rid = create_rule_minimal(
             name=rule_name,
             policy=policy,
-            enabled=True,
+            enabled=rule_enabled,
             ip_group_ids=gids
         )
         log.info("[RULE] created '%s' (ID %s) with %d groups", rule_name, rid, len(gids))

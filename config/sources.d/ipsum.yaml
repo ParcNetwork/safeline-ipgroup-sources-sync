@@ -1,0 +1,72 @@
+enabled: true
+kind: txt-scored
+group_base: ipsum
+change_detector: hash
+
+urls:
+  - https://raw.githubusercontent.com/stamparm/ipsum/master/ipsum.txt
+
+txt:
+  field_sep: "\t"
+  ip_index: 0
+  score_index: 1
+
+upload:
+  max_per_group: 10000
+  initial_batch_size: 10000
+  append_batch_size: 10000
+  sleep_between_batches: 0.2
+  cleanup: delete
+  placeholder_ip: 192.0.2.1
+
+levels:
+  - level: 1
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
+  - level: 2
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
+  - level: 3
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
+  - level: 4
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
+  - level: 5
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
+  - level: 6
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
+  - level: 7
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
+  - level: 8
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
+  - level: 9
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
+  - level: 10
+    enabled: true
+    rules:
+      enabled: true
+      policy: deny
