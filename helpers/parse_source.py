@@ -16,6 +16,7 @@ from helpers.change_detect import decide_change
 from helpers import log
 from helpers.text_lists import fetch_text_lines
 from helpers.ipsum.process_ipsum import process_ipsum_scored
+from helpers.snapshot import save_ip_snapshot
 
 
 def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> None:
@@ -413,6 +414,8 @@ def _maybe_patch_abuseip(
         sleep_between_batches=sleep_between_batches,
         placeholder_ip=placeholder_ip,
     )
+
+    save_ip_snapshot("abuseip", ips)
 
     try:
         sync_rule_to_used(rule_name, base_group, used)

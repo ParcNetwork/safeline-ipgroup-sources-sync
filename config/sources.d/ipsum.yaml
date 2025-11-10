@@ -19,6 +19,9 @@ upload:
   cleanup: delete
   placeholder_ip: 192.0.2.1
 
+exclude_from:
+  - abuseip
+
 levels:
   - level: 1
     enabled: true

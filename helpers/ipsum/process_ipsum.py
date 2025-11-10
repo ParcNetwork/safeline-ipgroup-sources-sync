@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Dict, Any, List, Optional, Tuple
 
-from api.rules import delete_rule
 from helpers import log
 
 from helpers.text_lists import fetch_text_lines
@@ -10,6 +9,7 @@ from helpers.ipsum.scored_lists import parse_scored_lines
 from helpers.hash import _hash_list
 from helpers.grouping import upsert_grouped_entries, cleanup_extra_groups
 from helpers.rules_sync import sync_rule_to_used
+from helpers.snapshot import load_ip_snapshots
 
 RuleAction = Tuple[str, Optional[int], str, bool, int]
 
@@ -35,6 +35,7 @@ def process_ipsum_scored(
     txt_def = cfg.get("txt", {}) or {}
     upload_def = cfg.get("upload", {}) or {}
     rules_def = cfg.get("rules", {}) or {}
+    exclude_from = cfg.get("exclude_from")
 
     lvl_defs: List[Dict[str, Any]] = cfg.get("levels") or []
     if not lvl_defs:
@@ -69,6 +70,15 @@ def process_ipsum_scored(
 
         rules_cfg = {**rules_def, **(ld.get("rules") or {})}
         upload = {**upload_def, **(ld.get("upload") or {})}
+
+        if isinstance(exclude_from, str):
+            exclude_from = [exclude_from]
+
+        exclude_from = [x.strip() for x in exclude_from if x and str(x).strip()]
+        if exclude_from:
+            exclude_set = load_ip_snapshots(exclude_from)
+            if exclude_set:
+                ips = [ip for ip in ips if ip not in exclude_set]
 
         base_group = f"{base_prefix}-l{level}"
         state_key = f"txtscored:{name}:{level}:{url}"
