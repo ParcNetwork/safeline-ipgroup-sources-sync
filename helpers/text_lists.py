@@ -2,6 +2,7 @@ from __future__ import annotations
 import requests
 from typing import List
 
+
 def fetch_text_lines(url: str, timeout: int = 20) -> List[str]:
     r = requests.get(url, timeout=timeout)
     r.raise_for_status()

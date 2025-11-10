@@ -1,6 +1,7 @@
 .idea/
 .DS_Store
 .ipranges_state.json
+*.ips.txt.gz
 __pycache__/
 config/.env
 config/local.d
