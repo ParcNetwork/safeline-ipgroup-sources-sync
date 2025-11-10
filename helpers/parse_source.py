@@ -46,14 +46,17 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
 
     if kind == "txt-scored":
         actions = process_ipsum_scored(name, cfg, state)
-        for rule_name, rule_policy, base, rule_enabled in actions:
-            if rule_policy is None:
+
+        for rule_name, rule_policy, base, rule_enabled, used in actions:
+
+            if rule_policy is None or used == 0:
                 if delete_rule(rule_name):
-                    log.info("%s: rule deleted (no policy in YAML)", rule_name)
+                    log.info("%s: rule deleted: ", rule_name)
                 else:
                     log.debug("%s: no rule to delete (no policy in YAML)", rule_name)
             else:
                 ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+
         return
 
     if kind == "json-cidrs":

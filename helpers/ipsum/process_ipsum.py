@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Dict, Any, List, Optional, Tuple
+
+from api.rules import delete_rule
 from helpers import log
 
 from helpers.text_lists import fetch_text_lines
@@ -9,7 +11,7 @@ from helpers.hash import _hash_list
 from helpers.grouping import upsert_grouped_entries, cleanup_extra_groups
 from helpers.rules_sync import sync_rule_to_used
 
-RuleAction = Tuple[str, Optional[int], str, bool]
+RuleAction = Tuple[str, Optional[int], str, bool, int]
 
 _ACTION_BY_POLICY = {"allow": 0, "deny": 1}
 
@@ -79,8 +81,6 @@ def process_ipsum_scored(
         rule_enabled = bool(rules_cfg.get("enabled", True))
         rule_name = rules_cfg.get("name", base_group)
 
-        actions.append((rule_name, pol, base_group, rule_enabled))
-
         if prev_hash == new_hash:
             log.info("%s/l%d: unchanged — skip.", name, level)
             continue
@@ -95,12 +95,15 @@ def process_ipsum_scored(
             placeholder_ip=upload.get("placeholder_ip", "192.0.2.1"),
         )
 
+        actions.append((rule_name, pol, base_group, rule_enabled, used))
+
         try:
             sync_rule_to_used(rule_name, base_group, used)
         except Exception as e:
             log.warning("rule sync failed for '%s': %s", rule_name, e)
 
         prev_groups = int(state.get(f"{base_group}_group_count", 0))
+
         cleanup_extra_groups(
             base_group_name=base_group,
             used_count=used,
