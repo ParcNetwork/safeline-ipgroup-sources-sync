@@ -1,0 +1,21 @@
+enabled: true
+kind: json-cidrs
+group_base: google-user-triggered
+change_detector: auto
+urls:
+  - https://developers.google.com/search/apis/ipranges/user-triggered-fetchers.json
+json:
+  timestamp_field: creationTime
+  cidr_fields:
+    - ipv4Prefix
+    - ipv6Prefix
+rules:
+  policy: allow
+  enabled: true
+upload:
+  max_per_group: 10000
+  initial_batch_size: 10000
+  append_batch_size: 500
+  sleep_between_batches: 0.4
+  cleanup: delete
+  placeholder_ip: 192.0.2.1
