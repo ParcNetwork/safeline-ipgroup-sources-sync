@@ -18,6 +18,8 @@ from helpers.text_lists import fetch_text_lines
 from helpers.ipsum.process_ipsum import process_ipsum_scored
 from helpers.snapshot import save_ip_snapshot
 
+from helpers.playwright_json import fetch_playwright_json_data
+
 
 def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> None:
     if not cfg.get("enabled", False):
@@ -60,7 +62,41 @@ def process_source(name: str, cfg: Dict[str, Any], state: Dict[str, Any]) -> Non
 
         return
 
-    if kind == "json-cidrs":
+    if kind == "playwright-json":
+        pj_cfg = cfg.get("playwright-json", {}) or {}
+        ts_field = pj_cfg.get("timestamp_field", "creationTime")
+        cidr_fields = pj_cfg.get("cidr_fields")
+        page_locator = pj_cfg.get("page_locator")
+        for url in cfg["urls"]:
+            data = fetch_playwright_json_data(url, page_locator)
+            new_ts = data.get(ts_field)
+            cidrs = extract_cidrs_from_json(data, cidr_fields)
+            _maybe_patch_json_source(
+                url=url,
+                cidrs=cidrs,
+                new_ts=new_ts,
+                base_group=base,
+                state=state,
+                placeholder_ip=placeholder_ip,
+                max_per_group=max_per_group,
+                initial_batch_size=initial_batch_size,
+                append_batch_size=append_batch_size,
+                sleep_between_batches=sleep_between_batches,
+                cleanup_action=cleanup_action,
+                rule_name=rule_name,
+                change_detector=detector
+            )
+
+            if rule_policy is None:
+                if delete_rule(rule_name):
+                    log.info("%s: rule deleted (no policy in YAML)", rule_name)
+                else:
+                    log.debug("%s: no rule to delete (no policy in YAML)", rule_name)
+            else:
+                ensure_rule_safe(rule_name, rule_policy, base, rule_enabled)
+
+
+    elif kind == "json-cidrs":
         json_cfg = cfg.get("json", {}) or {}
         ts_field = json_cfg.get("timestamp_field", "creationTime")
         cidr_fields = json_cfg.get("cidr_fields")
