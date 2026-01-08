@@ -31,6 +31,7 @@ SOURCES_DIRS="${SOURCES_DIRS_OVERRIDE:-"${SOURCES_DIRS_DEFAULT}"}"
 
 exec ${RUNTIME} run --rm \
   --name ip-sync \
+  --shm-size=1g \
   --env-file "${ENV_FILE}" \
   -e "STATE_PATH=/app/persist/.ipranges_state.json" \
   -e "LOG_LEVEL=${LOG_LEVEL:-INFO}" \
