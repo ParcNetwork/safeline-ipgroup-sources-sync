@@ -9,4 +9,4 @@ config/local.d
 *.pyo
 *.pyd
 .docker
-.venv
+.venvcreate_tag.sh
