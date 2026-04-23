@@ -9,4 +9,5 @@ config/local.d
 *.pyo
 *.pyd
 .docker
-.venvcreate_tag.sh
+.venv
+create_tag.sh
